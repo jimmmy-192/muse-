@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grid Gradient with Layers</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #111;
+      position: relative;
+    }
+
+    /* 底层背景图 */
+    .background-image {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%;
+      z-index: 0; /* 最底层 */
+      object-fit: cover;
+      pointer-events: none; /* 保证鼠标事件透过 */
+    }
+
+    /* 网格+渐变（中间层） */
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1; /* 中间层 */
+    }
+
+    /* 上层覆盖图片 */
+    .overlay-image {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%;
+      height: auto;
+      z-index: 2; /* 最上层 */
+      pointer-events: none;
+    }
+
+    /* 控件 */
+    .controls {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 10px;
+      border-radius: 8px;
+      z-index: 3; /* 始终在最上面 */
+      font-size: 14px;
+    }
+    .controls label {
+      display: block;
+      margin: 6px 0;
+    }
+    .controls .val {
+      margin-left: 6px;
+      font-weight: bold;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <!-- 底层背景 -->
+  <img src="background.png" class="background-image" alt="Background">
+
+  <!-- 网格渐变 -->
+  <canvas id="gridCanvas"></canvas>
+
+  <!-- 上层覆盖图片 -->
+  <img src="shuru.png" class="overlay-image" alt="Overlay">
+
+  <!-- 控制面板 -->
+  <div class="controls">
+    <label>Spacing: 
+      <input id="spacing" type="range" min="10" max="100" value="40">
+      <span id="valSpacing" class="val">40</span>
+    </label>
+    <label>Range: 
+      <input id="dispRange" type="range" min="50" max="800" value="300">
+      <span id="valRange" class="val">300</span>
+    </label>
+    <label>Min Radius: 
+      <input id="minRadius" type="range" min="0" max="200" value="30">
+      <span id="valMinRadius" class="val">30</span>
+    </label>
+    <label>Fade Trail: 
+      <input id="trailFade" type="range" min="0" max="1" step="0.05" value="0.1">
+      <span id="valFade" class="val">0.1</span>
+    </label>
+    <label>Grad Scale: 
+      <input id="gradScale" type="range" min="0.5" max="2" step="0.1" value="1">
+      <span id="valScale" class="val">1</span>
+    </label>
+    <label>Opacity: 
+      <input id="opacity" type="range" min="0" max="1" step="0.05" value="1">
+      <span id="valOpacity" class="val">1</span>
+    </label>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gridCanvas');
+    const gridCtx = canvas.getContext('2d');
+    let w, h;
+
+    const spacingInput = document.getElementById('spacing');
+    const dispRangeInput = document.getElementById('dispRange');
+    const minRadiusInput = document.getElementById('minRadius');
+    const trailFadeInput = document.getElementById('trailFade');
+    const gradScaleInput = document.getElementById('gradScale');
+    const opacityInput = document.getElementById('opacity');
+
+    // 数值展示
+    const valSpacing = document.getElementById('valSpacing');
+    const valRange = document.getElementById('valRange');
+    const valMinRadius = document.getElementById('valMinRadius');
+    const valFade = document.getElementById('valFade');
+    const valScale = document.getElementById('valScale');
+    const valOpacity = document.getElementById('valOpacity');
+
+    function bindValue(input, span) {
+      span.textContent = input.value;
+      input.addEventListener('input', () => {
+        span.textContent = input.value;
+      });
+    }
+    bindValue(spacingInput, valSpacing);
+    bindValue(dispRangeInput, valRange);
+    bindValue(minRadiusInput, valMinRadius);
+    bindValue(trailFadeInput, valFade);
+    bindValue(gradScaleInput, valScale);
+    bindValue(opacityInput, valOpacity);
+
+    let mouseX = null, mouseY = null;
+    let targetOpacity = 0;
+    let currentOpacity = 0;
+
+    function resize() {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function drawGrid(mx, my, opacity) {
+      gridCtx.clearRect(0, 0, w, h);
+
+      const spacing = Number(spacingInput.value);
+      const gradScale = Number(gradScaleInput.value);
+      const range = Number(dispRangeInput.value);
+      const minInnerRadius = Number(minRadiusInput.value);
+
+      const x = mx ?? w / 2;
+      const y = my ?? h / 2;
+
+      const g = gridCtx.createRadialGradient(x, y, minInnerRadius, x, y, range * gradScale);
+      g.addColorStop(0, `rgba(220,221,221,${opacity})`);
+      g.addColorStop(0.5, `rgba(245,245,245,${opacity})`);
+      g.addColorStop(1, `rgba(255,255,255,${opacity})`);
+
+      gridCtx.strokeStyle = g;
+      gridCtx.lineWidth = 1;
+
+      gridCtx.beginPath();
+      for (let xline = 0; xline <= w; xline += spacing) {
+        gridCtx.moveTo(xline + 0.5, 0);
+        gridCtx.lineTo(xline + 0.5, h);
+      }
+      for (let yline = 0; yline <= h; yline += spacing) {
+        gridCtx.moveTo(0, yline + 0.5);
+        gridCtx.lineTo(w, yline + 0.5);
+      }
+      gridCtx.stroke();
+    }
+
+    function loop() {
+      const fade = Number(trailFadeInput.value);
+      gridCtx.fillStyle = `rgba(255,255,255,${fade})`;
+      gridCtx.fillRect(0, 0, w, h);
+
+      currentOpacity += (targetOpacity - currentOpacity) * 0.1;
+
+      if (mouseX !== null && mouseY !== null && currentOpacity > 0.01) {
+        drawGrid(mouseX, mouseY, currentOpacity * Number(opacityInput.value));
+      }
+      requestAnimationFrame(loop);
+    }
+    loop();
+
+    window.addEventListener('mousemove', e => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+      targetOpacity = 1;
+    });
+    window.addEventListener('mouseleave', () => {
+      mouseX = null;
+      mouseY = null;
+      targetOpacity = 0;
+    });
+  </script>
+</body>
+</html>
